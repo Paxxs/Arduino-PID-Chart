@@ -4,5 +4,6 @@
         "pyplot",
         "xlabel",
         "ylabel"
-    ]
+    ],
+    "python.formatting.provider": "black"
 }
