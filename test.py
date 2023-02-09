@@ -58,7 +58,7 @@ def draw_graph(
 
     # 控制图的最大最小
     x_min, x_max = 0, 10
-    y_min, y_max = 0, (setpoint + 3) if setpoint > 0 else 10
+    y_min, y_max = 0, setpoint if setpoint > 0 else 10
 
     def judge_xy_range(value, is_x: bool = True):
         """更新 x y 轴上的最大最小范围
@@ -97,8 +97,9 @@ def draw_graph(
 
         # 更新数组
         pid_time_array.append(judge_xy_range(time))
-        pid_output_array.append(judge_xy_range(output, False))
+        pid_output_array.append(output)
         pid_input_array.append(judge_xy_range(temp, False))
+        judge_xy_range(output * (max_output / 255), False) # 单独更新 output 输入限制
 
         # 更新图
         temp_t.set_data(pid_time_array, pid_input_array)
@@ -166,7 +167,9 @@ with serial.Serial(serial_com, serial_baudrate) as ser:
     3       加热模式
     """
     lines = read_from_com(ser)
-    graph, _ = draw_graph(int(lines[0]), float(lines[2]), float(lines[1]), setpoint)
+    graph, _ = draw_graph(
+        int(lines[0]), float(lines[2]), float(lines[1]), setpoint, int(setpoint)
+    )
     plt.show()
 
     # 存储数据
