@@ -99,7 +99,7 @@ def draw_graph(
         pid_time_array.append(judge_xy_range(time))
         pid_output_array.append(output)
         pid_input_array.append(judge_xy_range(temp, False))
-        judge_xy_range(output * (max_output / 255), False) # 单独更新 output 输入限制
+        judge_xy_range(output * (max_output / 255), False)  # 单独更新 output 输入限制
 
         # 更新图
         temp_t.set_data(pid_time_array, pid_input_array)
@@ -157,8 +157,11 @@ def init_csv_writer(
 serial_com = "COM5"
 serial_baudrate = 9600
 setpoint = 28.0
+kp = 0.3
+ki = 0.4
+kd = 0.5
 
-with serial.Serial(serial_com, serial_baudrate) as ser:
+with serial.Serial(serial_com, serial_baudrate,timeout=1) as ser:
     """数据格式
     index   value
     0       时间
@@ -167,22 +170,40 @@ with serial.Serial(serial_com, serial_baudrate) as ser:
     3       加热模式
     """
     lines = read_from_com(ser)
-    graph, _ = draw_graph(
-        int(lines[0]), float(lines[2]), float(lines[1]), setpoint, int(setpoint)
-    )
+    print("init:",lines)
+    if lines[0] != '':
+        graph, _ = draw_graph(
+            int(lines[0]), float(lines[2]), float(lines[1]), setpoint, int(setpoint)
+        )
+    else:
+        graph, _ = draw_graph(
+            0, 0, 0, setpoint, int(setpoint)
+        )
+        
     plt.show()
 
     # 存储数据
     header = ["time", "temperature", "output", "heatingMode"]
     write = init_csv_writer(header)
     while True:
-        plt.pause(1.3)
+        plt.pause(1)
         lines = read_from_com(ser)
         print(lines)
-        time: int = int(lines[0])
-        if lines[0] == "p":
+        if lines[0] == 'p' or lines[0] == '':
+            plt.pause(1)
             plt.ioff()
+        elif lines[0] == "Input":
+            match lines[1]:
+                case "Kp":
+                    ser.write(str(kp).encode())
+                case "Ki":
+                    ser.write(str(ki).encode())
+                case "Kd":
+                    ser.write(str(kd).encode())
+                case "SetPoint":
+                    ser.write(str(setpoint).encode())
         else:
             plt.ion()
             write(lines)  # 写入
+            time: int = int(lines[0])
             graph(time, float(lines[2]), float(lines[1]))
