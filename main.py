@@ -23,6 +23,7 @@ def init_plot(
 def draw_graph(
     time: int = 0,
     output: float = 0.0,
+    dht: float = 0.0,
     temp: float = 0.0,
     setpoint: float = 25.00,
     max_output=255,  # 控制输出最大值
@@ -36,11 +37,15 @@ def draw_graph(
     pid_output_array = [  # 输出
         output,
     ]
-    pid_input_array = [  # 温度
+    pid_input_array = [  # pid 温度
         temp,
+    ]
+    dht_array = [  # dht 温度
+        dht,
     ]
 
     temp_t = ax.plot(pid_time_array, pid_input_array, "-r", label="Temp")[0]
+    dht_temp_t = ax.plot(pid_time_array, dht_array, "-r", label="DHT Temp")[0]
     output_t = ax.plot(
         pid_time_array,
         [i * (max_output / 255) for i in pid_output_array],
@@ -79,7 +84,9 @@ def draw_graph(
             y_max = max(y_max, value)
         return value
 
-    def update_graph(time: int, output: float, temp: float, setpoint: float = setpoint):
+    def update_graph(
+        time: int, output: float, dht: float, temp: float, setpoint: float = setpoint
+    ):
         """更新绘图
 
         Args:
@@ -91,18 +98,20 @@ def draw_graph(
         Returns:
             Axes: plt
         """
-        nonlocal pid_time_array, pid_output_array, pid_input_array
-        nonlocal temp_t, output_t, setpoint_t, max_output
+        nonlocal pid_time_array, pid_output_array, pid_input_array, dht_array
+        nonlocal temp_t, dht_temp_t, output_t, setpoint_t, max_output
         nonlocal x_max, x_max, y_max, y_min
 
         # 更新数组
         pid_time_array.append(judge_xy_range(time))
         pid_output_array.append(output)
         pid_input_array.append(judge_xy_range(temp, False))
-        judge_xy_range(output * (max_output / 255), False)  # 单独更新 output 输入限制
+        dht_array.append(judge_xy_range(dht, False))
+        judge_xy_range(output * (max_output / 255), False)  # 单独更新 output 范围限制
 
         # 更新图
         temp_t.set_data(pid_time_array, pid_input_array)
+        dht_temp_t.set_data(pid_time_array, dht_array)
         output_t.set_data(
             pid_time_array, [i * (max_output / 255) for i in pid_output_array]
         )
@@ -130,6 +139,10 @@ def read_from_com(ser: serial.Serial, sep: str = "-"):
     """
     line_str = ser.readline().decode().rstrip()
     return line_str.split(sep)
+
+
+def write_to_com_float(ser: serial.Serial, num: float):
+    ser.write(str(num).encode())
 
 
 def init_csv_writer(
@@ -161,25 +174,32 @@ kp = 0.3
 ki = 0.4
 kd = 0.5
 
-with serial.Serial(serial_com, serial_baudrate,timeout=1) as ser:
+with serial.Serial(serial_com, serial_baudrate, timeout=1) as ser:
     """数据格式
     index   value
     0       时间
-    1       温度
-    2       输出
-    3       加热模式
+    1       pid 输入温度
+    2       dht 温度
+    3       输出
+    4       加热模式
     """
     lines = read_from_com(ser)
-    print("init:",lines)
-    if lines[0] != '':
+    print("init:", lines)
+    if lines[0] != "":
         graph, _ = draw_graph(
-            int(lines[0]), float(lines[2]), float(lines[1]), setpoint, int(setpoint)
+            time=int(lines[0]),
+            temp=float(lines[1]),
+            dht=float(lines[2]),
+            output=float(lines[3]),
+            setpoint=setpoint,
+            max_output=int(setpoint),
         )
     else:
         graph, _ = draw_graph(
-            0, 0, 0, setpoint, int(setpoint)
+            setpoint=setpoint,
+            max_output=int(setpoint),
         )
-        
+
     plt.show()
 
     # 存储数据
@@ -189,21 +209,28 @@ with serial.Serial(serial_com, serial_baudrate,timeout=1) as ser:
         plt.pause(1)
         lines = read_from_com(ser)
         print(lines)
-        if lines[0] == 'p' or lines[0] == '':
+        if lines[0] == "p" or lines[0] == "":
             plt.pause(1)
             plt.ioff()
         elif lines[0] == "Input":
             match lines[1]:
                 case "Kp":
-                    ser.write(str(kp).encode())
+                    write_to_com_float(ser, kp)
                 case "Ki":
-                    ser.write(str(ki).encode())
+                    write_to_com_float(ser, ki)
                 case "Kd":
-                    ser.write(str(kd).encode())
+                    write_to_com_float(ser, kd)
                 case "SetPoint":
-                    ser.write(str(setpoint).encode())
+                    write_to_com_float(ser, setpoint)
         else:
             plt.ion()
             write(lines)  # 写入
-            time: int = int(lines[0])
-            graph(time, float(lines[2]), float(lines[1]))
+            # time: int = int(lines[0])
+            # graph(time, float(lines[2]), float(lines[1]))
+            graph(
+                time=int(lines[0]),
+                temp=float(lines[1]),
+                dht=float(lines[2]),
+                output=float(lines[3]),
+                setpoint=setpoint,
+            )
