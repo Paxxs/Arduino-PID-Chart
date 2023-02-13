@@ -1,6 +1,26 @@
-# Arduino 寄居蟹温控器记录绘图工具
+# Arduino PID 温控器测试用绘图工具
 
-给我的 Arduino 寄居蟹温控器测试实时绘制图表和数据记录
+给我的 Arduino PID 温控器测试实时绘制图表和数据记录。
+
+## 特性
+
+- 绘制图表
+- 数据保存
+- 参数输入
+
+## 使用
+
+> 按需修改代码中的配置项
+
+```python
+python -m venv venv
+
+# end venv
+
+pip -r requirements.txt
+
+python main.py
+```
 
 ## 接受的数据格式
 
